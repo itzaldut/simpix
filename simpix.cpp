@@ -4,6 +4,7 @@
 #include "TASImage.h"
 #include "TApplication.h"
 #include "TSystem.h"
+#include "TLatex.h"
 
 #include <iostream>
 #include <vector>
@@ -14,8 +15,8 @@
 using namespace std;
 
 inline double colorDist(UInt_t a, UInt_t b) {
-    int ra = (a >> 16) & 0xff, ga = (a >> 8) & 0xff, ba = (a) & 0xff;
-    int rb = (b >> 16) & 0xff, gb = (b >> 8) & 0xff, bb = (b) & 0xff;
+    int ra = (a >> 16) & 0xff, ga = (a >> 8) & 0xff, ba = a & 0xff;
+    int rb = (b >> 16) & 0xff, gb = (b >> 8) & 0xff, bb = b & 0xff;
     double dr = ra - rb, dg = ga - gb, db = ba - bb;
     return sqrt(dr*dr + dg*dg + db*db);
 }
@@ -34,8 +35,8 @@ int main(int argc, char** argv) {
 
     TApplication app("app", &argc, argv);
 
-    TASImage *src = new TASImage(srcFile.Data());
-    TASImage *tgt = new TASImage(tgtFile.Data());
+    TASImage* src = new TASImage(srcFile.Data());
+    TASImage* tgt = new TASImage(tgtFile.Data());
     assert(src->GetWidth() == tgt->GetWidth() &&
            src->GetHeight() == tgt->GetHeight());
 
@@ -43,7 +44,7 @@ int main(int argc, char** argv) {
     long N = W * H;
     cout << "Image size: " << W << "x" << H << " total pix = " << N << "\n";
 
-    TASImage *out = new TASImage(*src);
+    TASImage* out = new TASImage(*src);
     UInt_t* outPix = out->GetArgbArray();
     UInt_t* tgtPix = tgt->GetArgbArray();
 
@@ -61,13 +62,17 @@ int main(int argc, char** argv) {
     uniform_int_distribution<int> distIdx(0, N - 1);
     uniform_real_distribution<double> distU(0.0, 1.0);
 
-    double T = 1e3;
-    double Tmin = 1e-3;
-    double alpha = 0.99;
+    // Parameters of Annealing
+    double T = 5000;
+    double Tmin = 0.01;
+    double alpha = 0.998;
 
     auto t_start = chrono::high_resolution_clock::now();
 
+    int swapsPerTemp = 10000;
+
     while (T > Tmin) {
+    for (int k = 0; k < swapsPerTemp; ++k) {
         int i = distIdx(rng);
         int j = distIdx(rng);
         if (i == j) continue;
@@ -82,9 +87,9 @@ int main(int argc, char** argv) {
             swap(outPix[i], outPix[j]);
             currE += dE;
         }
-
-        T *= alpha;
     }
+    T *= alpha;
+   }
 
     auto t_end = chrono::high_resolution_clock::now();
     chrono::duration<double> elapsed = t_end - t_start;
@@ -92,14 +97,33 @@ int main(int argc, char** argv) {
     cout << "Final energy: " << currE << "\n";
     cout << "Annealing time: " << elapsed.count() << " seconds\n";
 
-    TCanvas *c1 = new TCanvas("c1", "simpix output", W, H);
+    TCanvas* c1 = new TCanvas("c1", "simpix output", W, H);
     c1->Divide(2, 2);
-    c1->cd(1); src->Draw("X");
-    c1->cd(2); tgt->Draw("X");
-    c1->cd(3); out->Draw("X");
+
+    c1->cd(1);
+    src->Draw("X");
+    TLatex l1(0.5, 0.95, "Source");
+    l1.SetNDC(); l1.SetTextAlign(22); l1.SetTextSize(0.05); l1.Draw();
+
+    c1->cd(2);
+    tgt->Draw("X");
+    TLatex l2(0.5, 0.95, "Target");
+    l2.SetNDC(); l2.SetTextAlign(22); l2.SetTextSize(0.05); l2.Draw();
+
+    c1->cd(3);
+    out->Draw("X");
+    TLatex l3(0.5, 0.95, "Output");
+    l3.SetNDC(); l3.SetTextAlign(22); l3.SetTextSize(0.05); l3.Draw();
+
     c1->Print("collage.png");
 
-    out->WriteImage(outFile.Data());
+    TCanvas* outCanvas = new TCanvas("outCanvas", "Output Image", W, H);
+    out->Draw("X");
+    TLatex outLabel(0.5, 0.95, "Output");
+    outLabel.SetNDC(); outLabel.SetTextAlign(22); outLabel.SetTextSize(0.05);
+    outLabel.Draw();
+    outCanvas->SaveAs(outFile.Data());
+
     cout << "Done. Output saved to " << outFile << "\n";
     return 0;
 }

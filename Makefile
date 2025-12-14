@@ -1,18 +1,12 @@
-# ROOT flags
 ROOTCFLAGS := $(shell root-config --cflags)
 ROOTGLIBS  := $(shell root-config --glibs)
 ROOTLIBS   := $(shell root-config --libs)
 
-# Compiler
 CXX     := g++ -Wall -O3
 CXXFLAGS := $(ROOTCFLAGS)
 
-# Additional required libraries:
-#   -lASImage for TASImage
-#   and GUI libs for TApplication, TCanvas, etc.
 EXTRALIBS := -lASImage
 
-# Targets
 TARGETS := simpix simpix_start
 
 all: $(TARGETS)
